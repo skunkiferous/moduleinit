@@ -53,7 +53,8 @@ calling the level0InitModule() of dependencies more than once.
 Once the main module level0InitModuleXXX() has been called, we can assume
 that all level0InitModuleXXX() procs were called. At that point, we know all
 the registered modules, can assume that no other module is used, and can move
-to level 1 initialisation.
+to level 1 initialisation. This is done with runInitialisers().
+runDeInitialisers() should be called before shutting down (or "resetting").
 
 level1InitModuleXXX() are never called directly by your code. A level 1 init
 proc is called, when all level 1 init procs of it's dependencies have been
@@ -113,8 +114,8 @@ registration only requires names and proc pointers.
 
 Any module that allocates resources, and in particular threads, in it's init
 proc, should free those resources in it's deinit proc. Note that deinit might
-also be called in the case of an initialisation failure, such that it is best
-to not assume full successful initialisation when running deinit.
+also be called in the case of an initialisation failure (TODO), such that it
+is best to not assume full successful initialisation when running deinit.
 Implementing deinit procs make it possible for an application to re-configure
 at runtime, without leaking resources.
 
@@ -132,7 +133,7 @@ automatically at compile time, by scanning the imports, but I believe this
 would be problematic, since all the stdlib imports would also be added as
 dependencies, while not having been explicitly registered, causing the
 initialisation to fail on "missing modules". Also, since module aliases are
-a core part of the design, and those dependencies can (presumalby) not be
+a core part of the design, and those dependencies can (presumably) not be
 detected automatically, I believe that specifying the dependencies "manually"
 is (currently) the best solution. The main downside is that you have to
 remember to update level0InitModuleXXX() when changing the imports.
