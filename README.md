@@ -21,11 +21,14 @@ actually access a module. Level 0 is used for the "discovery" of all modules,
 so in Level 0, we should make sure to access all modules we need at least
 once. To make this easy, all modules should provide an init proc like this:
 
+```nim
 proc level0InitModuleXXX*(): void =
+  ## Registers module xxx.
   if registerModule("xxx", @["yyy","zzz"], level1InitModuleXXX,
       level1DeInitModuleXXX, threadInitXXX, threadDeInitXXX):
     level0InitModuleYYY()
     level0InitModuleZZZ()
+```
 
 Modules yyy and zzz are assumed to be direct dependencies of xxx.
 Everything is "optional", except the name. The order of the dependencies
