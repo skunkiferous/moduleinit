@@ -22,7 +22,6 @@ so in Level 0, we should make sure to access all modules we need at least
 once. To make this easy, all modules should provide an init proc like this:
 
 proc level0InitModuleXXX*(): void =
-  ## Registers module xxx.
   if registerModule("xxx", @["yyy","zzz"], level1InitModuleXXX,
       level1DeInitModuleXXX, threadInitXXX, threadDeInitXXX):
     level0InitModuleYYY()
