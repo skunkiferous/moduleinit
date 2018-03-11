@@ -10,7 +10,7 @@ import strutils
 import tables
 import times
 
-import moduleinit/stringvalue
+import moduleinitpkg/stringvalue
 
 const MAX_TL_INIT_PROCS = 100
   ## Maximum number of registered InitThreadLocalsProc.
@@ -71,22 +71,13 @@ type
     prevModule: ptr ModuleConfig
       ## The previously registered module.
 
-const NV = NimVersion.split('.')
-const USE_NOW = (len(NV) != 3) or (NV[0] != "0") or (NV[1] != "17")
-
-proc now(): string =
-  when USE_NOW:
-    $times.now()
-  else:
-    $getLocalTime(getTime())
-
 proc defaultInfoLog(msg: string): void {.nimcall, gcsafe.} =
   ## Default INFO log()
-  echo(now() & " INFO moduleinit " & msg)
+  echo($now() & " INFO moduleinit " & msg)
 
 proc defaultErrorLog(msg: string): void {.nimcall, gcsafe.} =
   ## Default ERROR log()
-  echo(now() & " ERROR moduleinit " & msg)
+  echo($now() & " ERROR moduleinit " & msg)
 
 
 var loginfo*: proc(msg: string): void {.nimcall, gcsafe.} = defaultInfoLog

@@ -7,9 +7,11 @@ license       = "MIT"
 
 srcDir        = "src"
 
+bin = @["moduleinit"]
+
 # Dependencies
 
-requires "nim >= 0.17.0"
+requires "nim >= 0.18.0"
 
 # Tasks
 

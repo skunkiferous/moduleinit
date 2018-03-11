@@ -8,7 +8,7 @@ import logging
 import strutils
 import tables
 
-import moduleinit/stringvalue
+import moduleinitpkg/stringvalue
 import moduleinit
 
 const FORMAT_PROP* = "logginginit.format"
