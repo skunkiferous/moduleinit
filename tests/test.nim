@@ -34,7 +34,6 @@ proc level0InitModuleTest*(): void {.nimcall, gcsafe.} =
 
 proc runTest() =
   echo("Registering all modules...")
-  debugModuleinit = true
   level0InitModuleTest()
 
   var config = newTable[string,string]()
@@ -47,11 +46,13 @@ proc runTest() =
   echo("Running all initialisers...")
   runInitialisers(config, "nativesockets")
 
+  # stdlib logging now available.
   info("App code runs now...")
   sendHello()
 
   info("App code done; shuting down...")
   runDeInitialisers()
+  # stdlib logging now shutdown(?)
   echo("Shut down complete")
 
 runTest()

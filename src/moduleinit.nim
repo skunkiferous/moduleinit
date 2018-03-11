@@ -6,15 +6,14 @@
 # See README.md for usage.
 
 import locks
+import strutils
 import tables
+import times
 
 import moduleinit/stringvalue
 
 const MAX_TL_INIT_PROCS = 100
   ## Maximum number of registered InitThreadLocalsProc.
-
-var debugModuleinit* = false
-  ## Perform debug output during (de)initialisation?
 
 type
   InitModuleProc* = proc(config: TableRef[string,string]): void {.nimcall, gcsafe.}
@@ -72,6 +71,33 @@ type
     prevModule: ptr ModuleConfig
       ## The previously registered module.
 
+const NV = NimVersion.split('.')
+const USE_NOW = (len(NV) != 3) or (NV[0] != "0") or (NV[1] != "17")
+
+proc now(): string =
+  when USE_NOW:
+    $times.now()
+  else:
+    $getLocalTime(getTime())
+
+proc defaultInfoLog(msg: string): void {.nimcall, gcsafe.} =
+  ## Default INFO log()
+  echo(now() & " INFO moduleinit " & msg)
+
+proc defaultErrorLog(msg: string): void {.nimcall, gcsafe.} =
+  ## Default ERROR log()
+  echo(now() & " ERROR moduleinit " & msg)
+
+
+var loginfo*: proc(msg: string): void {.nimcall, gcsafe.} = defaultInfoLog
+  ## INFO log(). Replace with loging method of choice.
+  ## Set to nil to avoid info output.
+
+var logerror*: proc(msg: string): void {.nimcall, gcsafe.} = defaultErrorLog
+  ## ERROR log(). Replace with loging method of choice.
+  ## Do NOT set to nil; this would cause a crash in case of error.
+
+
 var initLock: Lock
   ## Lock to allow safe multi-threaded use of moduleinit.
   ## All following global variables are guarded by this lock.
@@ -124,34 +150,34 @@ proc findOrCreateModule(name: string): ptr ModuleConfig =
   result.prevModule = lastModule
   lastModule = result
 
-proc initModule(m: ptr ModuleConfig, info: ModuleInfo) =
+proc initModule(m: ptr ModuleConfig, mi: ModuleInfo) =
   ## Initialises a ModuleConfig object
-  m.depsCount = if info.deps.isNil: 0 else: len(info.deps)
+  m.depsCount = if mi.deps.isNil: 0 else: len(mi.deps)
   if m.depsCount > 0:
     m.deps = createShared(ptr ModuleConfig, m.depsCount)
     var p = m.deps
     for i in 0..<m.depsCount:
-      p[] = findOrCreateModule(info.deps[i])
+      p[] = findOrCreateModule(mi.deps[i])
       inc p
-  m.level1Init = info.level1Init
-  m.level1DeInit = info.level1DeInit
-  m.threadInit = info.threadInit
-  m.threadDeInit = info.threadDeInit
+  m.level1Init = mi.level1Init
+  m.level1DeInit = mi.level1DeInit
+  m.threadInit = mi.threadInit
+  m.threadDeInit = mi.threadDeInit
   m.initialised = false
-  if debugModuleinit:
-    echo("Module '" & info.name & "' registered in moduleinit.")
+  if not loginfo.isNil:
+    loginfo("Module '" & mi.name & "' registered in moduleinit.")
 
-proc registerModule*(info: ModuleInfo): bool =
+proc registerModule*(mi: ModuleInfo): bool =
   ## Registers a module, with it's name, dependencies, initialisers,
   ## deinitialisers, thread initialiser and thread deinitialiser.
   ## All parameters are optional, except the name, which cannot be nil or
   ## empty.
   ## Returns true on the first call. Other calls return false and do nothing.
-  if info.name.isNil:
+  if mi.name.isNil:
     raise newException(Exception, "name is nil!")
-  if len(info.name) == 0:
+  if len(mi.name) == 0:
     raise newException(Exception, "name is empty!")
-  var mn: ModuleName = info.name
+  var mn: ModuleName = mi.name
   result = false
   acquire(initLock)
   try:
@@ -163,13 +189,13 @@ proc registerModule*(info: ModuleInfo): bool =
         if m.depsCount == -1:
           # Was only registered as dummy...
           result = true
-          initModule(m, info)
+          initModule(m, mi)
         return
       m = m.prevModule
     # New module!
     result = true
     m = createShared(ModuleConfig,1)
-    initModule(m, info)
+    initModule(m, mi)
     m.name = mn
     m.prevModule = lastModule
     lastModule = m
@@ -187,14 +213,14 @@ proc registerModule*(name: string,
   ## All parameters are optional, except the name, which cannot be nil or
   ## empty.
   ## Returns true on the first call. Other calls return false and do nothing.
-  var info: ModuleInfo
-  info.name = name
-  info.deps = deps
-  info.level1Init = level1Init
-  info.level1DeInit = level1DeInit
-  info.threadInit = threadInit
-  info.threadDeInit = threadDeInit
-  registerModule(info)
+  var mi: ModuleInfo
+  mi.name = name
+  mi.deps = deps
+  mi.level1Init = level1Init
+  mi.level1DeInit = level1DeInit
+  mi.threadInit = threadInit
+  mi.threadDeInit = threadDeInit
+  registerModule(mi)
 
 proc registerModule*(name: string, deps: varargs[string]): bool =
   ## Registers a module, with it's name and dependencies.
@@ -222,17 +248,17 @@ proc sortModules(modules: seq[ptr ModuleConfig],
     aliases: TableRef[string,string]): seq[ptr ModuleConfig] =
   ## Sort all modules, based on their dependencies.
   result = newSeq[ptr ModuleConfig]()
-  var todo = newSeq[ptr ModuleConfig]()
+  var unprocessed = newSeq[ptr ModuleConfig]()
   for m in modules:
     if m.aliasedTo.isNil:
-      todo.add(m)
+      unprocessed.add(m)
     else:
       # At this point, module aliases have been resolved, so that we don't need
       # them anymore.
       deallocShared(m)
-  while len(todo) > 0:
+  while len(unprocessed) > 0:
     var undone = newSeq[ptr ModuleConfig]()
-    for m in todo:
+    for m in unprocessed:
       var addToResult = true
       var p = m.deps
       for x in 0..<m.depsCount:
@@ -244,11 +270,11 @@ proc sortModules(modules: seq[ptr ModuleConfig],
         result.add(m)
       else:
         undone.add(m)
-    if len(todo) == len(undone):
+    if len(unprocessed) == len(undone):
       raise newException(Exception,
         "Failed to sort modules according to their (circular?) dependencies: "&
-        buildDependencies(todo))
-    todo = undone
+        buildDependencies(unprocessed))
+    unprocessed = undone
   # Use lastModule to point to the "highest" (last) initialised module.
   var prevModule: ptr ModuleConfig = nil
   for m in result:
@@ -278,25 +304,32 @@ proc runModuleInitChecks(m: ptr ModuleConfig, initialised: bool) =
 
 proc runInit(modules: seq[ptr ModuleConfig], config: TableRef[string,string]) =
   ## Runs all module initialisers.
-  # TODO Failure here should cause appropriate denitialisers to be called.
   for m in modules:
     runModuleInitChecks(m, false)
     if not m.level1Init.isNil:
-      if debugModuleinit:
-        echo("Module '" & $m.name & "' about to be initialised...")
-      m.level1Init(config)
+      if not loginfo.isNil:
+        loginfo("Module '" & $m.name & "' about to be initialised...")
+      try:
+        m.level1Init(config)
+      except:
+        let emsg = getCurrentExceptionMsg()
+        logerror("Aborting; module '" & $m.name & "' failed to initialise: " & emsg)
+        raise
     m.initialised = true
 
 proc runDeInit() =
   ## Runs all module deinitialisers.
-  # TODO Failure here should still try to run all denitialisers.
   var m = lastModule
   while m != nil:
     runModuleInitChecks(m, true)
     if not m.level1DeInit.isNil:
-      if debugModuleinit:
-        echo("Module '" & $m.name & "' about to be deinitialised...")
-      m.level1DeInit()
+      if not loginfo.isNil:
+        loginfo("Module '" & $m.name & "' about to be deinitialised...")
+      try:
+        m.level1DeInit()
+      except:
+        let emsg = getCurrentExceptionMsg()
+        logerror("Module '" & $m.name & "' failed to deinitialise: " & emsg)
     m.initialised = false
     m = m.prevModule
   m = lastModule
@@ -392,7 +425,8 @@ proc runThreadLocalDeInitialisers*() =
   ## Runs all DeInitThreadLocalsProcs.
   ## Only call this after all de-initialisers have been registered.
   if threadName.isNil:
-    # TODO This should not happpen; warn?
+    if not loginfo.isNil:
+      loginfo("Thread-name is nil in runThreadLocalDeInitialisers(). Multiple calls in same thread?")
     return
   var deinitialisers: array[MAX_TL_INIT_PROCS,DeInitThreadLocalsProc]
   var count: int
@@ -406,11 +440,15 @@ proc runThreadLocalDeInitialisers*() =
   finally:
     release(initLock)
   for i in countdown(count-1,0):
-    # TODO Catch and ignore (log?) failures here?
-    if debugModuleinit:
-      # Unsynchronized access (to save copying big array)! Crossing fingers...
-      echo("Module '" & $allInitThreadLocalsProcModules[i] & "' about to be thread-deinitialised...")
-    deinitialisers[i]()
+    # Unsynchronized access (to save copying big array)! Crossing fingers...
+    let mname = $allInitThreadLocalsProcModules[i]
+    if not loginfo.isNil:
+      loginfo("Module '" & mname & "' about to be thread-deinitialised...")
+    try:
+      deinitialisers[i]()
+    except:
+      let emsg = getCurrentExceptionMsg()
+      logerror("Module '" & mname & "' failed to thread-deinitialise: " & emsg)
   threadName = nil
 
 proc runThreadLocalInitialisers*(name: string, autoRunTLDeinitialisers = true) =
@@ -437,11 +475,16 @@ proc runThreadLocalInitialisers*(name: string, autoRunTLDeinitialisers = true) =
   else:
     threadName = name
   for i in 0..<count:
-    # TODO what do we do on failure here?
-    if debugModuleinit:
-      # Unsynchronized access (to save copying big array)! Crossing fingers...
-      echo("Module '" & $allInitThreadLocalsProcModules[i] & "' about to be thread-initialised...")
-    initialisers[i]()
+    # Unsynchronized access (to save copying big array)! Crossing fingers...
+    let mname = $allInitThreadLocalsProcModules[i]
+    if not loginfo.isNil:
+      loginfo("Module '" & mname & "' about to be thread-initialised...")
+    try:
+      initialisers[i]()
+    except:
+      let emsg = getCurrentExceptionMsg()
+      logerror("Aborting; module '" & mname & "' failed to thread-initialise: " & emsg)
+      raise
   if autoRunTLDeinitialisers:
     onThreadDestruction(runThreadLocalDeInitialisers)
 
