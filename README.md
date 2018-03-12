@@ -7,6 +7,7 @@ nim package that provides module/thread initialisation ordering
 - Use "modules aliases" / "virtual modules" for complex (de)initialisation
 - Circular dependencies are NOT supported, nor is there any plan to do so
 - A utility "string value" helper module
+- An optional "stdlog" sub module, which sets up Nim standard logging
 - TODO: Explicit support for dynamically loaded libraries
 
 

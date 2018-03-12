@@ -1,13 +1,13 @@
 # Package
 
-version       = "0.2.0"
+version       = "0.3.0"
 author        = "Sebastien Diot"
 description   = "Nim module/thread initialisation ordering library"
 license       = "MIT"
 
 srcDir        = "src"
 
-bin = @["moduleinit"]
+#bin = @["moduleinit"]
 
 # Dependencies
 

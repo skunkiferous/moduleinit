@@ -8,6 +8,8 @@
 # Clients should define the "cluster.recv" alias.
 # "cluster.impl" must depend on "cluster.recv".
 
+import logging
+
 import moduleinit
 
 const CLUSTER_IMPL_ALIAS* = "cluster.impl"
@@ -27,5 +29,5 @@ var recvMsg* : SendMessageProc
 
 proc level0InitModuleCluster*(): void {.nimcall, gcsafe.} =
   ## Registers module cluster at level 0.
-  if registerModule("cluster"):
-    echo("cluster level 0 initialised")
+  if registerModule("cluster", @["stdlog"]):
+    info("cluster level 0 initialised")

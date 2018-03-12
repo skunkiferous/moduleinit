@@ -9,6 +9,7 @@
 ## heap.
 
 import hashes
+import segfaults
 
 export hash, `==`
 

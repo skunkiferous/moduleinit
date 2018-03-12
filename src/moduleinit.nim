@@ -6,11 +6,12 @@
 # See README.md for usage.
 
 import locks
+import segfaults
 import strutils
 import tables
 import times
 
-import moduleinitpkg/stringvalue
+import moduleinit/stringvalue
 
 const MAX_TL_INIT_PROCS = 100
   ## Maximum number of registered InitThreadLocalsProc.
@@ -71,11 +72,11 @@ type
     prevModule: ptr ModuleConfig
       ## The previously registered module.
 
-proc defaultInfoLog(msg: string): void {.nimcall, gcsafe.} =
+proc defaultInfoLog*(msg: string): void {.nimcall, gcsafe.} =
   ## Default INFO log()
   echo($now() & " INFO moduleinit " & msg)
 
-proc defaultErrorLog(msg: string): void {.nimcall, gcsafe.} =
+proc defaultErrorLog*(msg: string): void {.nimcall, gcsafe.} =
   ## Default ERROR log()
   echo($now() & " ERROR moduleinit " & msg)
 
@@ -124,6 +125,10 @@ initLock(initLock)
 
 proc inc[T](p: var ptr T) {.inline.} =
   p = cast[ptr T](cast[ByteAddress](p) +% sizeof(T))
+
+proc isDefaultModuleinitLogging*(): bool =
+  ## Returns true, if we are still using the default logging.
+  (loginfo == defaultInfoLog) and (logerror == defaultErrorLog)
 
 proc findOrCreateModule(name: string): ptr ModuleConfig =
   ## Searches for a module with the given name, and returns the ptr to it.
@@ -481,8 +486,8 @@ proc runThreadLocalInitialisers*(name: string, autoRunTLDeinitialisers = true) =
 
 proc getThreadName*(): string =
   ## Returns the name used to register this thread.
-  ## nil if unknown.
-  return threadName
+  ## $getThreadId() if unknown.
+  if threadName.isNil: $getThreadId() else: threadName
 
 proc runInitialisers*(config: TableRef[string,string], noinit: varargs[string]) =
   ## Should be called when the level 0 initialisation was complete.
