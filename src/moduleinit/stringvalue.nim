@@ -272,6 +272,8 @@ proc initStringValue*(s: string, LEN_PLUS_ONE: static[int]): StringValue[LEN_PLU
   initStringValue(cs, LEN_PLUS_ONE)
 
 type
+  StringValue8* = StringValue[8]
+    ## A 8-bytes StringValue (maximum length is 7).
   StringValue16* = StringValue[16]
     ## A 16-bytes StringValue (maximum length is 15).
   StringValue32* = StringValue[32]
@@ -281,27 +283,43 @@ type
   StringValue128* = StringValue[128]
     ## A 128-bytes StringValue (maximum length is 127).
   StringValue256* = StringValue[256]
-    ## A 256-bytes StringValue (maximum length is 256).
+    ## A 256-bytes StringValue (maximum length is 255).
+  StringValue512* = StringValue[512]
+    ## A 512-bytes StringValue (maximum length is 511).
+  StringValue1024* = StringValue[1024]
+    ## A 1024-bytes StringValue (maximum length is 1023).
 
-converter toStringValue*(s: string): StringValue16 {.inline, noSideEffect.} =
+converter toStringValue8*(s: string): StringValue8 {.inline, noSideEffect.} =
+  ## Converts a string to a StringValue8.
+  result = initStringValue(s, 8)
+
+converter toStringValue16*(s: string): StringValue16 {.inline, noSideEffect.} =
   ## Converts a string to a StringValue16.
   result = initStringValue(s, 16)
 
-converter toStringValue*(s: string): StringValue32 {.inline, noSideEffect.} =
+converter toStringValue32*(s: string): StringValue32 {.inline, noSideEffect.} =
   ## Converts a string to a StringValue32.
   result = initStringValue(s, 32)
 
-converter toStringValue*(s: string): StringValue64 {.inline, noSideEffect.} =
+converter toStringValue64*(s: string): StringValue64 {.inline, noSideEffect.} =
   ## Converts a string to a StringValue64.
   result = initStringValue(s, 64)
 
-converter toStringValue*(s: string): StringValue128 {.inline, noSideEffect.} =
+converter toStringValue128*(s: string): StringValue128 {.inline, noSideEffect.} =
   ## Converts a string to a StringValue128.
   result = initStringValue(s, 128)
 
-converter toStringValue*(s: string): StringValue256 {.inline, noSideEffect.} =
+converter toStringValue256*(s: string): StringValue256 {.inline, noSideEffect.} =
   ## Converts a string to a StringValue256.
   result = initStringValue(s, 256)
+
+converter toStringValue512*(s: string): StringValue512 {.inline, noSideEffect.} =
+  ## Converts a string to a StringValue512.
+  result = initStringValue(s, 512)
+
+converter toStringValue1024*(s: string): StringValue1024 {.inline, noSideEffect.} =
+  ## Converts a string to a StringValue1024.
+  result = initStringValue(s, 1024)
 
 when isMainModule:
   echo("TESTING StringValue ...")

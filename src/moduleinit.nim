@@ -11,13 +11,14 @@ import strutils
 import tables
 import times
 
+import moduleinit/anyvalue
 import moduleinit/stringvalue
 
 const MAX_TL_INIT_PROCS = 100
   ## Maximum number of registered InitThreadLocalsProc.
 
 type
-  InitModuleProc* = proc(config: TableRef[string,string]): void {.nimcall, gcsafe.}
+  InitModuleProc* = proc(config: TableRef[string,AnyValue]): void {.nimcall, gcsafe.}
     ## A proc that perform a level 1 initialisation of some module.
     ## It receives a table with 'global' configuration parameters.
 
@@ -240,8 +241,7 @@ proc buildDependencies(modules: seq[ptr ModuleConfig]): string =
     s = s & "]"
     result = result & s
 
-proc sortModules(modules: seq[ptr ModuleConfig],
-    aliases: TableRef[string,string]): seq[ptr ModuleConfig] =
+proc sortModules(modules: seq[ptr ModuleConfig]): seq[ptr ModuleConfig] =
   ## Sort all modules, based on their dependencies.
   result = newSeq[ptr ModuleConfig]()
   var unprocessed = newSeq[ptr ModuleConfig]()
@@ -298,7 +298,7 @@ proc runModuleInitChecks(m: ptr ModuleConfig, initialised: bool) =
           " before setting " & $m.name & " initialised to " & $initialised)
       inc p
 
-proc runInit(modules: seq[ptr ModuleConfig], config: TableRef[string,string]) =
+proc runInit(modules: seq[ptr ModuleConfig], config: TableRef[string,AnyValue]) =
   ## Runs all module initialisers.
   for m in modules:
     runModuleInitChecks(m, false)
@@ -337,12 +337,12 @@ proc runDeInit() =
     deallocShared(d)
   lastModule = nil
 
-proc resolveAliases(aliases: TableRef[string,string],
+proc resolveAliases(aliases: TableRef[string,AnyValue],
     modules: seq[ptr ModuleConfig], aliased: seq[ptr ModuleConfig]) =
   ## Resolve aliases, after finding all modules.
   for a in aliased:
     let mn = $a.name
-    let mappedTo = aliases[mn]
+    let mappedTo = aliases[mn].stringValue
     if mappedTo.isNil or len(mappedTo) == 0:
       raise newException(Exception, "Aliased module " & mn &
         " maps to nothing!")
@@ -367,7 +367,7 @@ proc resolveAliases(aliases: TableRef[string,string],
         p[] = a
       inc p
 
-proc findRegisteredModules(aliases: TableRef[string,string],
+proc findRegisteredModules(aliases: TableRef[string,AnyValue],
     noinit: openArray[string]): seq[ptr ModuleConfig] =
   ## Finds all registered modules.
   result = newSeq[ptr ModuleConfig]()
@@ -489,7 +489,7 @@ proc getThreadName*(): string =
   ## $getThreadId() if unknown.
   if threadName.isNil: $getThreadId() else: threadName
 
-proc runInitialisers*(config: TableRef[string,string], noinit: varargs[string]) =
+proc runInitialisers*(config: TableRef[string,AnyValue], noinit: varargs[string]) =
   ## Should be called when the level 0 initialisation was complete.
   ## It is assumed, that all modules that are dependencies, were also
   ## registered, or are included as 'noinit' parameters. Alternatively, they
@@ -502,9 +502,9 @@ proc runInitialisers*(config: TableRef[string,string], noinit: varargs[string]) 
   try:
     if initialised:
       raise newException(Exception, "Process already initialised!")
-    var config2 = if config.isNil: newTable[string,string]() else: config
+    var config2 = if config.isNil: newTable[string,AnyValue]() else: config
     var modules = findRegisteredModules(config2, noinit)
-    let sorted = sortModules(modules, config2)
+    let sorted = sortModules(modules)
     installTLInitialisers(sorted)
     runInit(sorted, config2)
     initialised = true

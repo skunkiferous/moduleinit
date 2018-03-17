@@ -13,6 +13,7 @@ import strutils
 import tables
 
 import moduleinit
+import moduleinit/anyvalue
 import moduleinit/stringvalue
 
 
@@ -135,18 +136,18 @@ proc threadDeInitStdlog(): void {.nimcall, gcsafe.} =
   if not rollingFileLogger.isNil:
     rollingFileLogger.levelThreshold = Level.lvlNone
 
-proc level1InitModuleStdlog(config: TableRef[string,string]): void {.nimcall, gcsafe.} =
+proc level1InitModuleStdlog(config: TableRef[string,AnyValue]): void {.nimcall, gcsafe.} =
   ## Initialises module stdlog at level 1.
 
   # First, we prepare console logging.
-  var cfmt = config.getOrDefault(CONSOLE_FORMAT_PROP)
-  if cfmt.isNil or len(cfmt) == 0:
+  var cfmt = $(config.getOrDefault(CONSOLE_FORMAT_PROP))
+  if cfmt.isNil or len(cfmt) == 0 or (cfmt == "nil"):
     cfmt = DEFAULT_CONSOLE_FORMAT
     warn("No console format specified; using default console format")
   globalConsoleFmt = cfmt
   globalConsoleLevel = DEFAULT_CONSOLE_LEVEL
-  var clvl = config.getOrDefault(CONSOLE_LEVEL_PROP)
-  if not clvl.isNil and len(clvl) > 0:
+  var clvl = $(config.getOrDefault(CONSOLE_LEVEL_PROP))
+  if not clvl.isNil and len(clvl) > 0 and (clvl != "nil"):
     try:
       globalConsoleLevel = parseEnum[Level](clvl)
       # Still using pre-init logging...
@@ -159,15 +160,15 @@ proc level1InitModuleStdlog(config: TableRef[string,string]): void {.nimcall, gc
     warn("No console logging level specified; using default console logging level")
 
   # Then, we prepare file logging.
-  var ffmt = config.getOrDefault(FILE_FORMAT_PROP)
-  if ffmt.isNil or len(ffmt) == 0:
+  var ffmt = $(config.getOrDefault(FILE_FORMAT_PROP))
+  if ffmt.isNil or len(ffmt) == 0 or (ffmt == "nil"):
     ffmt = DEFAULT_FILE_FORMAT
     warn("No file format specified; using default file format")
   globalFileFmt = ffmt
   globalFileLevel = DEFAULT_FILE_LEVEL
   globalFileMaxLines = DEFAULT_FILE_MAX_LINES
-  var flvl = config.getOrDefault(FILE_LEVEL_PROP)
-  if not flvl.isNil and len(flvl) > 0:
+  var flvl = $(config.getOrDefault(FILE_LEVEL_PROP))
+  if not flvl.isNil and len(flvl) > 0 and (flvl != "nil"):
     try:
       globalFileLevel = parseEnum[Level](flvl)
       # Still using pre-init logging...
@@ -178,8 +179,8 @@ proc level1InitModuleStdlog(config: TableRef[string,string]): void {.nimcall, gc
   else:
     # Still using pre-init logging...
     warn("No file logging level specified; using default file logging level")
-  var fml = config.getOrDefault(FILE_MAX_LINES_PROP)
-  if not fml.isNil and len(fml) > 0:
+  var fml = $(config.getOrDefault(FILE_MAX_LINES_PROP))
+  if not fml.isNil and len(fml) > 0 and (fml != "nil"):
     try:
       globalFileMaxLines = parseInt(fml)
       # Still using pre-init logging...
@@ -187,8 +188,8 @@ proc level1InitModuleStdlog(config: TableRef[string,string]): void {.nimcall, gc
     except:
       # Still using pre-init logging...
       error("Bad file max lines: '" & fml & "'; using default file max lines")
-  var fname = config.getOrDefault(FILE_NAME_PROP)
-  if fname.isNil or len(fname) == 0:
+  var fname = $(config.getOrDefault(FILE_NAME_PROP))
+  if fname.isNil or len(fname) == 0 or (fname == "nil"):
     fname = defaultFilename()
     warn("No file name specified; using default file name '" & fname & "'")
   globalFileName = fname

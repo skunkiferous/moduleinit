@@ -12,7 +12,8 @@ import strutils
 import tables
 
 import moduleinit
-import moduleinit\stdlog
+import moduleinit/anyvalue
+import moduleinit/stdlog
 import cluster
 
 const PORT_PROP* = "tcpcluster.port"
@@ -40,19 +41,18 @@ proc closeSocket() =
   ## Pretends to close a TCP socket
   info("Closing server socket on port " & $socket & " ...")
 
-proc level1InitModuleTcpcluster(config: TableRef[string,string]): void {.nimcall, gcsafe.} =
+proc level1InitModuleTcpcluster(config: TableRef[string,AnyValue]): void {.nimcall, gcsafe.} =
   ## Registers module tcpcluster at level 1.
-  sendMsg = messageSender
-  var port = 0
-  var portStr = config.getOrDefault(PORT_PROP)
-  if not portStr.isNil and len(portStr) > 0:
-    try:
-      port = parseInt(portStr)
-    except:
-      discard
-    if (port <= 0) or (port > int(high(uint16))):
-      raise newException(Exception, "Bad value for " & PORT_PROP & ": '" & portStr & "'")
-    openSocket(uint16(port))
+  if config.contains(PORT_PROP):
+    let portAV = config.getOrDefault(PORT_PROP)
+    if (portAV.kind == avUint16):
+      var port = portAV.uint16Value
+      if port == 0:
+        raise newException(Exception, "Bad value for " & PORT_PROP & ": '0'")
+      sendMsg = messageSender
+      openSocket(port)
+    else:
+      raise newException(Exception, "Bad type for " & PORT_PROP & ": '" & $portAV.kind & "'")
   else:
     raise newException(Exception, PORT_PROP & " undefined")
   info("tcpcluster level 1 initialised")

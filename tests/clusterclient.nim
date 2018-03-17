@@ -8,13 +8,14 @@ import logging
 import tables
 
 import moduleinit
-import moduleinit\stdlog
+import moduleinit/anyvalue
+import moduleinit/stdlog
 import cluster
 
 proc messageReceiver(node: NodeID, msg: Message) =
   info("Received message '" & msg & "' from node #" & $node)
 
-proc level1InitModuleClusterclient(config: TableRef[string,string]): void {.nimcall, gcsafe.} =
+proc level1InitModuleClusterclient(config: TableRef[string,AnyValue]): void {.nimcall, gcsafe.} =
   ## Registers module clusterclient at level 1.
   recvMsg = messageReceiver
   info("clusterclient level 1 initialised")
